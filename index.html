@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Informatika & KKA — Teknik Elektronika</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- Babel Standalone -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .font-code {
+      font-family: 'Fira Code', monospace;
+    }
+    
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    /* Glow Effects */
+    .glow-cyan {
+      box-shadow: 0 0 15px rgba(6, 182, 212, 0.35);
+    }
+    .glow-indigo {
+      box-shadow: 0 0 15px rgba(99, 102, 241, 0.35);
+    }
+    .glow-emerald {
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.35);
+    }
+    
+    @media print {
+      .no-print { display: none !important; }
+      .print-only { display: block !important; }
+      body { background: white; color: black; }
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+  <div id="root" class="flex-1 flex flex-col"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    function App() {
+      const [activeTab, setActiveTab] = useState('beranda');
+      const [selectedModul, setSelectedModul] = useState(1);
+      
+      // Hardware Simulator States
+      const [codeMode, setCodeMode] = useState('python'); // 'python' | 'cpp'
+      const [sensorTemp, setSensorTemp] = useState(28);
+      const [sensorDist, setSensorDist] = useState(45);
+      const [btnState, setBtnState] = useState(false);
+      const [ledRed, setLedRed] = useState(false);
+      const [ledGreen, setLedGreen] = useState(true);
+      const [buzzer, setBuzzer] = useState(false);
+      const [oledText, setOledText] = useState('SYSTEM READY\nTEI-KKA v2.4');
+      const [serialLogs, setSerialLogs] = useState([
+        '[INIT] System Booting up...',
+        '[INIT] ESP32 Microcontroller Ready.',
+        '[SENSOR] Temperature: 28 C | Distance: 45 cm'
+      ]);
+
+      // AI Simulator States
+      const [aiTarget, setAiTarget] = useState('resistor');
+      const [aiConfidence, setAiConfidence] = useState(96.4);
+      const [aiQuality, setAiQuality] = useState('OK - PASS');
+      const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+      // Quiz States
+      const [quizAnswers, setQuizAnswers] = useState({});
+      const [quizSubmitted, setQuizSubmitted] = useState(false);
+      const [quizScore, setQuizScore] = useState(0);
+
+      // Toolkit Tools State
+      const [adcVal, setAdcVal] = useState(512); // 0-1023
+      const [gateA, setGateA] = useState(0);
+      const [gateB, setGateB] = useState(0);
+
+      // Code Editor Presets
+      const [codePython, setCodePython] = useState(
+`# PROGRAM KONTROL SUHU & SENSOR JARAK (TEKNIK ELEKTRONIKA)
+import time
+
+def monitor_sistem(suhu, jarak, tombol):
+    print(f"[DATA] Suhu: {suhu}°C | Jarak: {jarak}cm")
+    
+    # Logika Alasan KKA: Kontrol Aktuator berdasarkan Sensor
+    if suhu > 35 or jarak < 20:
+        status_led_merah = True
+        status_led_hijau = False
+        status_buzzer = True
+        pesan_oled = f"WARNING!\\nSuhu: {suhu}C\\nJarak: {jarak}cm"
+    else:
+        status_led_merah = False
+        status_led_hijau = True
+        status_buzzer = False
+        pesan_oled = f"AMUN NORMAL\\nSuhu: {suhu}C\\nJarak: {jarak}cm"
+        
+    return status_led_merah, status_led_hijau, status_buzzer, pesan_oled
+
+# Simulasi Eksekusi
+red, green, buzz, msg = monitor_sistem(suhu=${sensorTemp}, jarak=${sensorDist}, tombol=${btnState})
+print("[ACTUATOR] LED Red:", red, "| LED Green:", green)
+print("[OLED DISPLAY]:\\n" + msg)`
+      );
+
+      const handleRunCode = () => {
+        let logs = [`[RUN] Executing ${codeMode.toUpperCase()} code...`];
+        
+        let red = false;
+        let green = true;
+        let buzz = false;
+        let msg = "STATUS: NORMAL";
+
+        if (sensorTemp > 35 || sensorDist < 20) {
+          red = true;
+          green = false;
+          buzz = true;
+          msg = `[ALARM] TEMP HIGH!\\nSuhu: ${sensorTemp}C\\nJarak: ${sensorDist}cm`;
+          logs.push(`[ALERT] Hazard condition detected! (Temp > 35°C OR Dist < 20cm)`);
+          logs.push(`[ACTION] Activating RED LED & Alarm Buzzer!`);
+        } else if (btnState) {
+          red = true;
+          green = true;
+          buzz = false;
+          msg = `MANUAL OVERRIDE\\nButton Pressed!`;
+          logs.push(`[INPUT] Manual switch triggered ON.`);
+        } else {
+          logs.push(`[INFO] System parameters within safe boundaries.`);
+          msg = `SYSTEM NORMAL\\nSuhu: ${sensorTemp}C | ${sensorDist}cm`;
+        }
+
+        setLedRed(red);
+        setLedGreen(green);
+        setBuzzer(buzz);
+        setOledText(msg.replace(/\\n/g, '\n'));
+
+        logs.push(`[OLED] Display Updated.`);
+        logs.push(`[FINISHED] Program execution completed successfully.`);
+        setSerialLogs(prev => [...prev.slice(-10), ...logs]);
+      };
+
+      const handleAiAnalyze = () => {
+        setIsAnalyzing(true);
+        setTimeout(() => {
+          setIsAnalyzing(false);
+          if (aiTarget === 'pcb_defect') {
+            setAiConfidence(98.2);
+            setAiQuality('REJECT - SHORT CIRCUIT DETECTED');
+          } else if (aiTarget === 'resistor') {
+            setAiConfidence(99.1);
+            setAiQuality('PASS - 10K Ohm (5% Tolerance)');
+          } else if (aiTarget === 'ic_chip') {
+            setAiConfidence(95.7);
+            setAiQuality('PASS - ATmega328P Alignment OK');
+          }
+        }, 800);
+      };
+
+      // Quiz Data
+      const quizQuestions = [
+        {
+          id: 1,
+          q: "Di dunia Teknik Elektronika, fungsi utama dari modul Analog-to-Digital Converter (ADC) pada mikrokontroler adalah...",
+          options: [
+            "A. Mengubah sinyal digital 0 dan 1 menjadi tegangan AC 220V",
+            "B. Mengubah sinyal kontinyu dari sensor analog menjadi data digital numerik",
+            "C. Mempercepat koneksi internet pada modul IoT",
+            "D. Menghasilkan pulsa PWM untuk mengendalikan kecepatan motor"
+          ],
+          correct: 1,
+          explain: "ADC berguna untuk membaca nilai fisik kontinyu (seperti tegangan sensor suhu/potensio) menjadi nilai digital (0-1023 atau 0-4095) agar dapat diproses oleh algoritma program."
+        },
+        {
+          id: 2,
+          q: "Perhatikan sintaks logika Python berikut: `if suhu > 40 or asap == True:`. Kapan kondisi tersebut bernilai BENAR (True)?",
+          options: [
+            "A. Hanya saat suhu di atas 40 DAN asap bernilai True secara bersamaan",
+            "B. Saat suhu di atas 40 ATAU saat asap bernilai True (salah satu atau keduanya)",
+            "C. Hanya saat suhu di bawah 40",
+            "D. Kapanpun sensor terhubung ke mikrokontroler"
+          ],
+          correct: 1,
+          explain: "Operator logika 'or' memberikan hasil True jika minimal salah satu dari kondisi yang diuji bernilai True."
+        },
+        {
+          id: 3,
+          q: "Apa peran Kecerdasan Artifisial (TinyML / Computer Vision) dalam industri manufaktur elektronika modern?",
+          options: [
+            "A. Menggantikan seluruh kabel tembaga dengan jaringan nirkabel",
+            "B. Melakukan inspeksi cacat solder PCB dan variasi komponen secara otomatis dengan kamera",
+            "C. Menghilangkan kebutuhan daya listrik pada sistem embedded",
+            "D. Memperbesar ukuran fisik komponen resistor dan kapasitor"
+          ],
+          correct: 1,
+          explain: "AI Vision digunakan pada mesin AOI (Automated Optical Inspection) untuk mendeteksi cacat penyolderan dan komponen komponen mikroskopis secara cepat dan presisi tinggi."
+        },
+        {
+          id: 4,
+          q: "Berikut ini yang merupakan contoh penerapan Input, Proses, dan Output (IPO) pada pintu gerbang otomatis berbasis mikrokontroler adalah...",
+          options: [
+            "A. Input: Motor Servo | Proses: Sensor Ultrasonik | Output: Kabel Jumper",
+            "B. Input: Sensor Ultrasonik | Proses: Algoritma Python/C++ | Output: Motor Servo Pembuka Gerbang",
+            "C. Input: Baterai 12V | Proses: Lampu LED | Output: Buzzer",
+            "D. Input: Layar LCD | Proses: Saklar ON/OFF | Output: Listrik PLN"
+          ],
+          correct: 1,
+          explain: "Input menerima sinyal luar (sensor ultrasonik), Proses mengeksekusi instruksi logika algoritma, dan Output melakukan aksi fisik (motor servo bergerak)."
+        }
+      ];
+
+      const handleScoreQuiz = () => {
+        let score = 0;
+        quizQuestions.forEach(q => {
+          if (quizAnswers[q.id] === q.correct) score += 25;
+        });
+        setQuizScore(score);
+        setQuizSubmitted(true);
+      };
+
+      return (
+        <div className="flex-1 flex flex-col min-h-screen">
+          {}
+          {/* Top Header */}
+          <header className="no-print bg-slate-900 border-b border-slate-800 sticky top-0 z-50 shadow-md">
+            <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center font-bold text-xl text-white shadow-lg glow-cyan">
+                  ⚡
+                </div>
+                <div>
+                  <h1 className="text-base font-extrabold tracking-tight text-slate-100 flex items-center gap-2">
+                    E-INFORMATIKA & KKA
+                    <span className="bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-[10px] font-mono px-2 py-0.5 rounded-full">
+                      JURUSAN TEKNIK ELEKTRONIKA
+                    </span>
+                  </h1>
+                  <p className="text-xs text-slate-400">Pembelajaran Interaktif Pemrograman Embedded, IoT & Artificial Intelligence</p>
+                </div>
+              </div>
+
+              {/* Navigation Tabs */}
+              <nav className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 text-xs font-semibold">
+                {[
+                  { id: 'beranda', label: '🏠 Beranda & Peta Konsep' },
+                  { id: 'modul', label: '📚 Modul Pembelajaran' },
+                  { id: 'lab', label: '💻 Lab Embedded & AI' },
+                  { id: 'kuis', label: '📝 Kuis & Evaluasi' },
+                  { id: 'toolkit', label: '🧰 Toolkit TEI-KKA' }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`px-3 py-2 rounded-lg transition whitespace-nowrap ${
+                      activeTab === tab.id
+                        ? 'bg-cyan-600 text-white font-bold shadow-md shadow-cyan-600/30'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </nav>
+            </div>
+          </header>
+
+          {/* Main Content Viewport */}
+          <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+
+            {}
+            {activeTab === 'beranda' && (
+              <div className="space-y-6">
+                {/* Hero Banner */}
+                <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/30 rounded-2xl p-6 sm:p-8 shadow-2xl">
+                  <div className="absolute -top-24 -right-24 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                  <div className="relative z-10 max-w-3xl space-y-4">
+                    <div className="inline-flex items-center gap-2 bg-indigo-500/20 border border-indigo-400/30 px-3 py-1 rounded-full text-xs text-indigo-300 font-mono">
+                      <span>🤖</span> Integrasi Kurikulum Informatika + KKA + Mikroelektronika
+                    </div>
+                    <h2 className="text-2xl sm:text-4xl font-extrabold text-white leading-tight">
+                      Mewujudkan Teknisi Elektronika Cerdas Berbasis <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400">Koding & Kecerdasan Artifisial</span>
+                    </h2>
+                    <p className="text-sm text-slate-300 leading-relaxed">
+                      Selamat datang di portal pembelajaran khusus SMK Teknik Elektronika (Teknik Elektronika Industri, Mechatronics, & Audio Video). Di sini kalian akan mempelajari bagaimana baris kode program dan algoritma AI mengendalikan hardware, sensor, aktuator, hingga sistem inspeksi otomatis industri.
+                    </p>
+                    <div className="pt-2 flex flex-wrap gap-3">
+                      <button 
+                        onClick={() => setActiveTab('lab')}
+                        className="px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg glow-cyan transition flex items-center gap-2"
+                      >
+                        <span>▶️</span> Buka Lab Simulator Interaktif
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('modul')}
+                        className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-xl border border-slate-700 transition"
+                      >
+                        📖 Pelajari Modul Teori & Praktikum
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Core Pillars / Mindmap */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-cyan-500/50 transition shadow-sm space-y-3">
+                    <div className="w-10 h-10 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 flex items-center gap-1 justify-center text-xl font-bold">
+                      💻
+                    </div>
+                    <h3 className="text-base font-bold text-slate-100">1. Algoritma & Pemrograman Embedded</h3>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Memahami logika Pemrograman Python & C++, variabel data sensor, struktur percabangan (if-else), perulangan (loops), dan komunikasi Serial ke Microcontroller.
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-indigo-500/50 transition shadow-sm space-y-3">
+                    <div className="w-10 h-10 rounded-lg bg-indigo-500/20 border border-indigo-500/40 text-indigo-400 flex items-center justify-center text-xl font-bold">
+                      🔌
+                    </div>
+                    <h3 className="text-base font-bold text-slate-100">2. IoT & Hardware Interfacing</h3>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Mengintegrasikan sinyal Analog/Digital dari sensor (Suhu, Ultrasonic, LDR) ke ESP32/Arduino dan mengontrol aktuator (Relay, Motor PWM, Display OLED).
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-emerald-500/50 transition shadow-sm space-y-3">
+                    <div className="w-10 h-10 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-xl font-bold">
+                      🧠
+                    </div>
+                    <h3 className="text-base font-bold text-slate-100">3. Kecerdasan Artifisial Elektronika</h3>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Mengenal Machine Learning, TinyML pada Mikrokontroler, Computer Vision untuk Auto Quality Control komponen, dan Prediksi Maintenance Alat Industri.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Flow Diagram Informatika + TEI */}
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                  <h3 className="text-sm font-bold text-cyan-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <span>🔄</span> Alur Kerja Sistem Otomasi Berbasis KKA & TEI
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-center text-xs">
+                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                      <div className="text-2xl">📡</div>
+                      <div className="font-bold text-slate-200">1. SENSOR (INPUT)</div>
+                      <div className="text-slate-400 text-[11px]">Menerima sinyal fisik (Suhu, Cahaya, Tegangan, Kamera)</div>
+                    </div>
+                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                      <div className="text-2xl">🧠</div>
+                      <div className="font-bold text-indigo-400">2. AI / PROSES</div>
+                      <div className="text-slate-400 text-[11px]">Algoritma Python/C++ / Model AI mengeksekusi logika</div>
+                    </div>
+                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                      <div className="text-2xl">⚡</div>
+                      <div className="font-bold text-emerald-400">3. AKTUATOR (OUTPUT)</div>
+                      <div className="text-slate-400 text-[11px]">Relay, Motor Servo, Buzzer, LED, Valve Solenoid</div>
+                    </div>
+                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                      <div className="text-2xl">☁️</div>
+                      <div className="font-bold text-cyan-400">4. MONITORING IoT</div>
+                      <div className="text-slate-400 text-[11px]">Dashboard Web, Firebase, OLED Display, Serial Log</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {}
+            {activeTab === 'modul' && (
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                {/* Sidebar Modul List */}
+                <div className="lg:col-span-1 space-y-2">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">Daftar Modul Praktikum</h3>
+                  {[
+                    { id: 1, title: 'Modul 1: Algoritma & Daspro Python/C++', desc: 'Konsep IPO, Variabel Data & Logika' },
+                    { id: 2, title: 'Modul 2: GPIO & Interfacing Sensor Sinyal', desc: 'ADC, DAC, PWM & Mikrokontroler' },
+                    { id: 3, title: 'Modul 3: AI Computer Vision Industri', desc: 'Inspeksi PCB & Komponen Otomatis' },
+                    { id: 4, title: 'Modul 4: TinyML & Machine Learning Sensor', desc: 'Klasifikasi Anomali Mesin Suhu/Getaran' }
+                  ].map(m => (
+                    <button
+                      key={m.id}
+                      onClick={() => setSelectedModul(m.id)}
+                      className={`w-full text-left p-3 rounded-xl border transition ${
+                        selectedModul === m.id
+                          ? 'bg-indigo-900/40 border-indigo-500 text-white shadow-md'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                      }`}
+                    >
+                      <div className="text-xs font-bold">{m.title}</div>
+                      <div className="text-[11px] text-slate-400 mt-1">{m.desc}</div>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Modul Detailed Content Display */}
+                <div className="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
+                  {selectedModul === 1 && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <h2 className="text-lg font-bold text-cyan-400">Modul 1: Algoritma & Pemrograman Dasar Embedded</h2>
+                        <span className="text-xs font-mono bg-cyan-500/20 text-cyan-300 px-2.5 py-1 rounded">Fase E / Kelas X TEI</span>
+                      </div>
+                      
+                      <div className="text-xs text-slate-300 leading-relaxed space-y-3">
+                        <p>
+                          <strong>Algoritma</strong> adalah urutan instruksi logis untuk menyelesaikan masalah. Dalam bidang Teknik Elektronika Industri, algoritma diketikkan ke dalam kode program lalu di-compile ke chip Mikrokontroler (seperti ESP32 / Arduino / PLC).
+                        </p>
+                        
+                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono text-xs space-y-2">
+                          <p className="text-indigo-400 font-bold">// Contoh Struktur Logika Python Kontrol Kipas Otomatis:</p>
+                          <p className="text-slate-300">suhu = read_sensor_lm35()</p>
+                          <p className="text-slate-300">if suhu &gt; 30:</p>
+                          <p className="text-emerald-400 pl-4">set_relay_fan(HIGH)  # Kipas Menyala</p>
+                          <p className="text-slate-300">else:</p>
+                          <p className="text-rose-400 pl-4">set_relay_fan(LOW)   # Kipas Mati</p>
+                        </div>
+
+                        <h4 className="font-bold text-slate-100 text-sm pt-2">Tipe Data Penting di Elektronika:</h4>
+                        <ul className="list-disc list-inside space-y-1 text-slate-300">
+                          <li><code className="text-amber-300">Boolean (bool)</code>: Mengakomodasi logika Digital HIGH/LOW (1 atau 0). Contoh: status tombol switch.</li>
+                          <li><code className="text-amber-300">Integer (int)</code>: Menyimpan nilai pembacaan sensor ADC (0 hingga 1023 / 4095).</li>
+                          <li><code className="text-amber-300">Float</code>: Menyimpan tegangan berpresisi koma (contoh: 3.25 Volt).</li>
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedModul === 2 && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <h2 className="text-lg font-bold text-cyan-400">Modul 2: GPIO Interfacing & Pengolahan Sinyal Sensor</h2>
+                        <span className="text-xs font-mono bg-cyan-500/20 text-cyan-300 px-2.5 py-1 rounded">Fase E/F TEI</span>
+                      </div>
+
+                      <div className="text-xs text-slate-300 leading-relaxed space-y-3">
+                        <p>
+                          Mikrokontroler berinteraksi dengan komponen luar melalui pin <strong>GPIO (General Purpose Input Output)</strong>.
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+                            <h4 className="font-bold text-indigo-400 text-xs mb-1">1. Pulse Width Modulation (PWM)</h4>
+                            <p className="text-slate-400 text-[11px]">Teknik mengatur lebar pulsa digital untuk mensimulasikan keluaran analog. Digunakan untuk meredupkan LED atau mengatur kecepatan Motor DC.</p>
+                          </div>
+                          <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+                            <h4 className="font-bold text-emerald-400 text-xs mb-1">2. Analog to Digital Converter (ADC)</h4>
+                            <p className="text-slate-400 text-[11px]">Mengubah tegangan analog 0V - 3.3V dari LDR / Potensio menjadi rentang numerik komputasi (0-4095 pada ESP32).</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedModul === 3 && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <h2 className="text-lg font-bold text-cyan-400">Modul 3: AI Computer Vision dalam Industri Elektronika</h2>
+                        <span className="text-xs font-mono bg-cyan-500/20 text-cyan-300 px-2.5 py-1 rounded">KKA Industri TEI</span>
+                      </div>
+
+                      <div className="text-xs text-slate-300 leading-relaxed space-y-3">
+                        <p>
+                          Dalam industri perakitan PCB modern (Surface Mount Technology / SMT), kualifikasi produk menggunakan kamera berkecepatan tinggi yang terhubung ke jaringan saraf tiruan (Convolutional Neural Network / CNN).
+                        </p>
+                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                          <h4 className="font-bold text-amber-400 text-xs mb-2">Manfaat AI Vision di TEI:</h4>
+                          <ul className="list-disc list-inside space-y-1 text-slate-300 text-[11px]">
+                            <li>Mendeteksi jembatan timah (solder bridge / short circuit) pada kaki IC mikroskopis.</li>
+                            <li>Verifikasi nilai toleransi pita warna resistor secara otomatis.</li>
+                            <li>Deteksi polaritas Elco / Diode yang terpasang terbalik.</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedModul === 4 && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <h2 className="text-lg font-bold text-cyan-400">Modul 4: TinyML & Predictive Maintenance</h2>
+                        <span className="text-xs font-mono bg-cyan-500/20 text-cyan-300 px-2.5 py-1 rounded">Advanced KKA TEI</span>
+                      </div>
+
+                      <div className="text-xs text-slate-300 leading-relaxed space-y-3">
+                        <p>
+                          <strong>TinyML</strong> adalah teknologi mengeksekusi model Machine Learning terkompresi langsung di dalam Mikrokontroler berdaya rendah (ESP32/STM32) tanpa tergantung koneksi server cloud.
+                        </p>
+                        <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs font-mono text-emerald-400">
+                          [SENSOR GETARAN MEMS] ➔ [TINYML MODEL DI ESP32] ➔ [PREDIKSI LAHER KERUSAKAN MESIN 89%]
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {}
+            {activeTab === 'lab' && (
+              <div className="space-y-6">
+                {/* Section Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                      <span>💻</span> LAB SIMULATOR EMBEDDED KKA & AI VISION
+                    </h2>
+                    <p className="text-xs text-slate-400">Simulasikan logika koding Python/C++ dengan aktuator LED, Buzzer, OLED & Sensor nyata.</p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCodeMode('python')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition ${
+                        codeMode === 'python' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      Python 3
+                    </button>
+                    <button
+                      onClick={() => setCodeMode('cpp')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition ${
+                        codeMode === 'cpp' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      C++ Arduino
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                  {/* Left Column: Code Editor & Serial (7 Cols) */}
+                  <div className="lg:col-span-7 space-y-4">
+                    {/* Code Editor Box */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
+                      <div className="bg-slate-950 px-4 py-2.5 border-b border-slate-800 flex justify-between items-center text-xs font-mono">
+                        <span className="text-slate-400 flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                          main.{codeMode === 'python' ? 'py' : 'ino'}
+                        </span>
+                        <button
+                          onClick={handleRunCode}
+                          className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold rounded-lg transition flex items-center gap-1.5 shadow-md glow-emerald text-xs"
+                        >
+                          <span>▶️</span> Eksekusi Logika
+                        </button>
+                      </div>
+
+                      <textarea
+                        rows="12"
+                        value={codePython}
+                        onChange={(e) => setCodePython(e.target.value)}
+                        className="w-full bg-slate-950 p-4 font-code text-xs text-indigo-300 focus:outline-none leading-relaxed"
+                      />
+                    </div>
+
+                    {/* Serial Monitor Log */}
+                    <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 font-code text-xs space-y-2">
+                      <div className="text-slate-500 text-[11px] font-bold border-b border-slate-800 pb-1 flex justify-between">
+                        <span>📡 SERIAL MONITOR LOG (115200 Baud)</span>
+                        <button onClick={() => setSerialLogs([])} className="text-slate-500 hover:text-slate-300">Clear</button>
+                      </div>
+                      <div className="h-32 overflow-y-auto space-y-1 text-slate-300">
+                        {serialLogs.map((log, i) => (
+                          <div key={i} className={log.includes('ALERT') ? 'text-rose-400 font-semibold' : log.includes('RUN') ? 'text-cyan-400' : 'text-slate-300'}>
+                            {log}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Virtual Hardware & Sensor Controls (5 Cols) */}
+                  <div className="lg:col-span-5 space-y-4">
+                    {/* Hardware Rack Simulation */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
+                      <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-wider border-b border-slate-800 pb-2">
+                        📟 VIRTUAL HARDWARE BOARD (TEI-ESP32)
+                      </h3>
+
+                      {/* Hardware Display OLED */}
+                      <div className="bg-black border-2 border-slate-700 rounded-xl p-3 font-code text-center text-cyan-400 text-xs shadow-inner min-h-[70px] flex items-center justify-center whitespace-pre-wrap">
+                        {oledText}
+                      </div>
+
+                      {/* Output Actuators LEDs & Buzzer */}
+                      <div className="grid grid-cols-3 gap-3 text-center">
+                        <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col items-center">
+                          <div className={`w-6 h-6 rounded-full mb-1 transition-all ${ledRed ? 'bg-rose-500 shadow-[0_0_12px_#f43f5e]' : 'bg-slate-800'}`}></div>
+                          <span className="text-[10px] text-slate-400 font-mono">LED MERAH</span>
+                        </div>
+                        <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col items-center">
+                          <div className={`w-6 h-6 rounded-full mb-1 transition-all ${ledGreen ? 'bg-emerald-400 shadow-[0_0_12px_#34d399]' : 'bg-slate-800'}`}></div>
+                          <span className="text-[10px] text-slate-400 font-mono">LED HIJAU</span>
+                        </div>
+                        <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col items-center">
+                          <div className={`w-6 h-6 rounded-full mb-1 transition-all ${buzzer ? 'bg-amber-400 animate-ping' : 'bg-slate-800'}`}></div>
+                          <span className="text-[10px] text-slate-400 font-mono">BUZZER</span>
+                        </div>
+                      </div>
+
+                      {/* Interactive Sensors Input Controls */}
+                      <div className="space-y-3 pt-2 border-t border-slate-800">
+                        <h4 className="text-[11px] font-bold text-slate-300">🎛️ SIMULATOR INPUT SENSOR & SWITCH:</h4>
+
+                        {/* Temperature Slider */}
+                        <div>
+                          <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                            <span>Sensor Suhu LM35:</span>
+                            <span className="font-mono text-cyan-300 font-bold">{sensorTemp} °C</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="10"
+                            max="60"
+                            value={sensorTemp}
+                            onChange={(e) => setSensorTemp(parseInt(e.target.value))}
+                            className="w-full accent-cyan-500 bg-slate-800 rounded-lg cursor-pointer"
+                          />
+                        </div>
+
+                        {/* Distance Ultrasonic Slider */}
+                        <div>
+                          <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                            <span>Sensor Ultrasonik HC-SR04:</span>
+                            <span className="font-mono text-indigo-300 font-bold">{sensorDist} cm</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="5"
+                            max="100"
+                            value={sensorDist}
+                            onChange={(e) => setSensorDist(parseInt(e.target.value))}
+                            className="w-full accent-indigo-500 bg-slate-800 rounded-lg cursor-pointer"
+                          />
+                        </div>
+
+                        {/* Push Button Toggle */}
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-[11px] text-slate-400">Digital Push Switch:</span>
+                          <button
+                            onClick={() => setBtnState(!btnState)}
+                            className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition ${
+                              btnState ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-400'
+                            }`}
+                          >
+                            {btnState ? 'PRESSED (HIGH)' : 'RELEASED (LOW)'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* AI Computer Vision Simulator Box */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+                      <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center justify-between">
+                        <span>🤖 SIMULATOR AI VISION QUALITY CONTROL</span>
+                        <span className="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded">YOLO / CNN</span>
+                      </h3>
+
+                      <div className="space-y-2">
+                        <label className="text-[11px] text-slate-400">Pilih Komponen PCB yang Diinspeksi Kamera:</label>
+                        <select
+                          value={aiTarget}
+                          onChange={(e) => setAiTarget(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-slate-200 focus:outline-none"
+                        >
+                          <option value="resistor">Resistor 10K Ohm (Warna Pita)</option>
+                          <option value="pcb_defect">Jalur PCB (Cek Konslet / Short Circuit)</option>
+                          <option value="ic_chip">Mikrokontroler ATmega328P (Posisi Pin)</option>
+                        </select>
+                      </div>
+
+                      <div className="relative bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col items-center justify-center min-h-[110px] text-center">
+                        {isAnalyzing ? (
+                          <div className="text-xs text-cyan-400 animate-pulse font-mono">
+                            🔍 AI Neural Network scanning image frames...
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <div className="text-xs font-mono font-bold text-slate-200">
+                              HASIL KLASIFIKASI:
+                            </div>
+                            <div className={`text-xs font-extrabold font-mono ${aiQuality.includes('PASS') ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              {aiQuality}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              Confidence Level: {aiConfidence}%
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={handleAiAnalyze}
+                        disabled={isAnalyzing}
+                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition shadow-md"
+                      >
+                        Pindai Komponen dengan AI Vision
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {}
+            {activeTab === 'kuis' && (
+              <div className="max-w-3xl mx-auto space-y-6">
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
+                  <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+                    <div>
+                      <h2 className="text-base font-bold text-slate-100">📝 Kuis Evaluasi Pemahaman Informatika & KKA</h2>
+                      <p className="text-xs text-slate-400">Uji pemahamanmu tentang algoritma, sensor mikrokontroler, dan AI elektronika.</p>
+                    </div>
+                    {quizSubmitted && (
+                      <div className="text-right">
+                        <span className="text-xs text-slate-400">Skor Akhir:</span>
+                        <div className="text-2xl font-extrabold text-cyan-400">{quizScore} / 100</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Questions List */}
+                  <div className="space-y-6">
+                    {quizQuestions.map((q, idx) => (
+                      <div key={q.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-3">
+                        <p className="text-xs font-semibold text-slate-200 leading-relaxed">
+                          {idx + 1}. {q.q}
+                        </p>
+
+                        <div className="space-y-2">
+                          {q.options.map((opt, optIdx) => (
+                            <button
+                              key={optIdx}
+                              disabled={quizSubmitted}
+                              onClick={() => setQuizAnswers({ ...quizAnswers, [q.id]: optIdx })}
+                              className={`w-full text-left p-2.5 rounded-lg text-xs transition border ${
+                                quizAnswers[q.id] === optIdx
+                                  ? 'bg-indigo-900/50 border-indigo-500 text-white font-semibold'
+                                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800'
+                              }`}
+                            >
+                              {opt}
+                            </button>
+                          ))}
+                        </div>
+
+                        {quizSubmitted && (
+                          <div className={`p-3 rounded-lg text-xs leading-relaxed ${
+                            quizAnswers[q.id] === q.correct ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-300' : 'bg-rose-950/60 border border-rose-500/40 text-rose-300'
+                          }`}>
+                            <strong>{quizAnswers[q.id] === q.correct ? '✓ Benar!' : '✗ Salah!'}</strong> {q.explain}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {!quizSubmitted ? (
+                    <button
+                      onClick={handleScoreQuiz}
+                      className="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg glow-cyan transition"
+                    >
+                      Kirim Jawaban & Hitung Skor
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setQuizSubmitted(false);
+                        setQuizAnswers({});
+                      }}
+                      className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl transition"
+                    >
+                      Ulangi Kuis
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {}
+            {activeTab === 'toolkit' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* ADC to Voltage Converter */}
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                  <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-2">
+                    <span>🧮</span> Kalkulator ADC Sensor (10-bit / 12-bit)
+                  </h3>
+                  <p className="text-xs text-slate-400">Konversi nilai ADC mikrokontroler ke perkiraan tegangan sinyal analog nyata (Volt).</p>
+
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex justify-between text-xs text-slate-300 mb-1">
+                        <span>Nilai ADC Terbaca:</span>
+                        <span className="font-mono font-bold text-cyan-400">{adcVal}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1023"
+                        value={adcVal}
+                        onChange={(e) => setAdcVal(parseInt(e.target.value))}
+                        className="w-full accent-cyan-500 bg-slate-800 rounded-lg"
+                      />
+                    </div>
+
+                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 grid grid-cols-2 gap-2 text-center">
+                      <div>
+                        <div className="text-[10px] text-slate-400">Tegangan (VCC 5V - Arduino):</div>
+                        <div className="text-lg font-bold font-mono text-emerald-400">
+                          {((adcVal / 1023) * 5.0).toFixed(2)} V
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-slate-400">Tegangan (VCC 3.3V - ESP32):</div>
+                        <div className="text-lg font-bold font-mono text-indigo-400">
+                          {((adcVal / 1023) * 3.3).toFixed(2)} V
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Logic Gate Simulator */}
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                  <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                    <span>⚡</span> Simulator Gerbang Logika Dasar
+                  </h3>
+                  <p className="text-xs text-slate-400">Eksperimen gerbang logika AND, OR, XOR, & NAND untuk merancang rangkaian pemrograman hardware.</p>
+
+                  <div className="flex items-center justify-center gap-4 py-2">
+                    <button
+                      onClick={() => setGateA(gateA === 0 ? 1 : 0)}
+                      className={`w-14 h-12 rounded-xl font-mono font-bold text-xs transition ${
+                        gateA === 1 ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      A = {gateA}
+                    </button>
+                    <button
+                      onClick={() => setGateB(gateB === 0 ? 1 : 0)}
+                      className={`w-14 h-12 rounded-xl font-mono font-bold text-xs transition ${
+                        gateB === 1 ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      B = {gateB}
+                    </button>
+                  </div>
+
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 grid grid-cols-4 gap-2 text-center text-xs font-mono">
+                    <div className="p-2 bg-slate-900 rounded-lg">
+                      <div className="text-slate-400 text-[10px]">AND</div>
+                      <div className="text-sm font-bold text-emerald-400">{gateA && gateB ? 1 : 0}</div>
+                    </div>
+                    <div className="p-2 bg-slate-900 rounded-lg">
+                      <div className="text-slate-400 text-[10px]">OR</div>
+                      <div className="text-sm font-bold text-emerald-400">{gateA || gateB ? 1 : 0}</div>
+                    </div>
+                    <div className="p-2 bg-slate-900 rounded-lg">
+                      <div className="text-slate-400 text-[10px]">XOR</div>
+                      <div className="text-sm font-bold text-emerald-400">{gateA ^ gateB ? 1 : 0}</div>
+                    </div>
+                    <div className="p-2 bg-slate-900 rounded-lg">
+                      <div className="text-slate-400 text-[10px]">NAND</div>
+                      <div className="text-sm font-bold text-emerald-400">{!(gateA && gateB) ? 1 : 0}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </main>
+
+          {}
+          {/* Footer */}
+          <footer className="no-print bg-slate-900 border-t border-slate-800 py-4 px-6 text-center text-xs text-slate-500">
+            Sistem Pembelajaran Informatika & KKA — Jurusan Teknik Elektronika (TEI / Mechatronics / AV)
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
